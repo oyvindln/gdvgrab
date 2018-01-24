@@ -1,0 +1,10 @@
+[package]
+name = "gdvgrab"
+version = "0.1.0"
+authors = ["oyvindln <oyvindln@users.noreply.github.com>"]
+
+[dependencies.subprocess]
+version = "0.1.12"
+
+[dependencies.gtk]
+version = "0.3.0"
