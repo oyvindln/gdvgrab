@@ -18,13 +18,16 @@
 
 extern crate gtk;
 extern crate subprocess;
+extern crate config_file_handler;
+#[macro_use]
+extern crate serde_derive;
 
 use gtk::prelude::*;
 use gtk::{Button, Window, WindowType, TextView, CheckButton};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::ops::DerefMut;
+use std::ops::{DerefMut, Deref};
 use subprocess::{Exec, ExitStatus};
 
 const REWIND_OPTION: &str = "-rewind";
@@ -33,6 +36,16 @@ const BUFFER_OPTIONS: [&str; 2] = ["-buffers", "1000"];
 const FORMAT_OPTIONS: [&str; 2] = ["-f", "dv2"];
 const PIPE_OPTION: &str = "-";
 const PLAYER_COMMAND: &str = "ffplay";// -i pipe:";
+
+const CONFIG_NAME: &str = "dvgrab";
+
+#[derive(Default, Serialize, Deserialize)]
+struct Config {
+    last_path: PathBuf,
+    guid: u64,
+    buffer_size: i32,
+    rewind_first: bool,
+}
 
 fn run_dvgrab_command(output: &PathBuf, rewind: bool) -> subprocess::Result<ExitStatus> {
     let cmd1 = if rewind {
@@ -99,6 +112,16 @@ fn main() {
         return;
     }
 
+    let mut config = Rc::new(RefCell::new({
+        if let Ok(config_file) =
+            config_file_handler::FileHandler::<Config>::new(CONFIG_NAME, false) {
+                println!("Config path used: {:?}", config_file.path());
+                config_file.read_file().unwrap_or_default()
+            } else {
+                Config::default()
+            }
+    }));
+
     let window = Rc::new(Window::new(WindowType::Toplevel));
     window.set_title("gdvgrab");
 
@@ -117,12 +140,13 @@ fn main() {
 
     let file_name_view = Rc::new(TextView::new());
     let rewind_checkbox = Rc::new(CheckButton::new_with_label("Rewind before starting"));
-    rewind_checkbox.set_active(true);
+    rewind_checkbox.set_active(config.borrow().rewind_first);
 
     let wc = window.clone();
     let fnw = file_name_view.clone();
     let ofp = output_file_path.clone();
     let sb = start_button.clone();
+    let mut cf = config.clone();
 
     button.connect_clicked(move |_| {
         let output_dialog = gtk::FileChooserDialog::new::<Window>(
@@ -131,7 +155,7 @@ fn main() {
             gtk::FileChooserAction::Save
         );
 
-
+        output_dialog.set_filename(&cf.borrow().last_path);
 
         output_dialog.add_button("_Cancel", gtk::ResponseType::Cancel.into());
         output_dialog.add_button("_Save", gtk::ResponseType::Accept.into());
@@ -140,13 +164,16 @@ fn main() {
 
         let res = output_dialog.run();
 
+        let accept_response: i32 = gtk::ResponseType::Accept.into();
+
         if let Some(output) = output_dialog.get_filename() {
-            if res == gtk::ResponseType::Accept.into() {
+            if res == accept_response {
                 output_dialog.hide();
                 fnw.get_buffer()
                     .expect("Fatal error! text view had no buffer for some reason!")
                     .set_text(output.to_str().unwrap_or("Filename was not valid unicode!"));
                 let mut oref = ofp.borrow_mut();
+                cf.borrow_mut().last_path = output.clone();
                 *oref.deref_mut() = Some(output);
                 sb.set_sensitive(true);
             } else {
@@ -179,4 +206,12 @@ fn main() {
     window.show_all();
 
     gtk::main();
+
+    // Save config.
+    if let Ok(config_file) = config_file_handler::FileHandler::<Config>::new(CONFIG_NAME, true) {
+        config.borrow_mut().rewind_first = rewind_checkbox.deref().get_active();
+        if let Err(e) = config_file.write_file(&config.borrow()) {
+            println!("Failed to write config! {}", e);
+        };
+    }
 }
