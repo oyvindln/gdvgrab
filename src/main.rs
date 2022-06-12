@@ -112,7 +112,7 @@ fn main() {
         return;
     }
 
-    let mut config = Rc::new(RefCell::new({
+    let config = Rc::new(RefCell::new({
         if let Ok(config_file) =
             config_file_handler::FileHandler::<Config>::new(CONFIG_NAME, false) {
                 println!("Config path used: {:?}", config_file.path());
@@ -146,7 +146,7 @@ fn main() {
     let fnw = file_name_view.clone();
     let ofp = output_file_path.clone();
     let sb = start_button.clone();
-    let mut cf = config.clone();
+    let cf = config.clone();
 
     button.connect_clicked(move |_| {
         let output_dialog = gtk::FileChooserDialog::new::<Window>(
@@ -164,10 +164,10 @@ fn main() {
 
         let res = output_dialog.run();
 
-        let accept_response: i32 = gtk::ResponseType::Accept.into();
+        // let accept_response = gtk::ResponseType::Accept.into();
 
         if let Some(output) = output_dialog.get_filename() {
-            if res == accept_response {
+            if res == gtk::ResponseType::Accept {
                 output_dialog.hide();
                 fnw.get_buffer()
                     .expect("Fatal error! text view had no buffer for some reason!")
