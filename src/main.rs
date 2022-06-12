@@ -79,7 +79,7 @@ fn show_message_dialog(message: &str, window: &Window, mtype: gtk::MessageType) 
                                          message
     );
     dialog.run();
-    dialog.destroy();
+    dialog.close();
 }
 
 fn run_dvgrab(output: &PathBuf, rewind: bool, window: &Window) {
@@ -134,12 +134,12 @@ fn main() {
 
     window.add(&main_box);
 
-    let button = Button::new_with_label("Select output file");
-    let start_button = Rc::new(Button::new_with_label("Start capture!"));
+    let button = Button::with_label("Select output file");
+    let start_button = Rc::new(Button::with_label("Start capture!"));
     start_button.set_sensitive(false);
 
     let file_name_view = Rc::new(TextView::new());
-    let rewind_checkbox = Rc::new(CheckButton::new_with_label("Rewind before starting"));
+    let rewind_checkbox = Rc::new(CheckButton::with_label("Rewind before starting"));
     rewind_checkbox.set_active(config.borrow().rewind_first);
 
     let wc = window.clone();
@@ -166,10 +166,10 @@ fn main() {
 
         // let accept_response = gtk::ResponseType::Accept.into();
 
-        if let Some(output) = output_dialog.get_filename() {
+        if let Some(output) = output_dialog.filename() {
             if res == gtk::ResponseType::Accept {
                 output_dialog.hide();
-                fnw.get_buffer()
+                fnw.buffer()
                     .expect("Fatal error! text view had no buffer for some reason!")
                     .set_text(output.to_str().unwrap_or("Filename was not valid unicode!"));
                 let mut oref = ofp.borrow_mut();
@@ -180,7 +180,7 @@ fn main() {
                 println!("Cancelled");
             }
         }
-        output_dialog.destroy();
+        output_dialog.close();
     });
 
     let ofp2 = output_file_path.clone();
@@ -194,7 +194,7 @@ fn main() {
         // Not sure how to avoid a copy here.
         let path = path_ref.clone().unwrap();
         sb2.set_sensitive(false);
-        run_dvgrab(&path, rcb2.get_active(), &wc2);
+        run_dvgrab(&path, rcb2.is_active(), &wc2);
         sb2.set_sensitive(true);
     });
 
@@ -209,7 +209,7 @@ fn main() {
 
     // Save config.
     if let Ok(config_file) = config_file_handler::FileHandler::<Config>::new(CONFIG_NAME, true) {
-        config.borrow_mut().rewind_first = rewind_checkbox.deref().get_active();
+        config.borrow_mut().rewind_first = rewind_checkbox.deref().is_active();
         if let Err(e) = config_file.write_file(&config.borrow()) {
             println!("Failed to write config! {}", e);
         };
